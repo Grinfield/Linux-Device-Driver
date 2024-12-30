@@ -11,6 +11,7 @@
 #include <linux/spinlock.h>
 #include <linux/seq_file.h>
 #include <linux/interrupt.h>
+#include <linux/version.h>
 
 #include <asm/hardirq.h>
 
@@ -36,13 +37,29 @@ int proc_release(struct inode *inode, struct file *filp)
 	return single_release(inode, filp);
 }
 
+//static struct proc_ops proc_ops = {
+//	.proc_open    = proc_open,
+//	.proc_read    = seq_read,
+//	.proc_lseek   = seq_lseek,
+//	.proc_release = proc_release,
+//};
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,6,0)
+static const struct file_operations proc_ops = {
+        .owner = THIS_MODULE,
+        .open = proc_open,
+        .read = seq_read,
+        .llseek = seq_lseek,
+        .release = proc_release,
+};
+#else
 static struct proc_ops proc_ops = {
 	.proc_open    = proc_open,
 	.proc_read    = seq_read,
 	.proc_lseek   = seq_lseek,
 	.proc_release = proc_release,
 };
-
+#endif
 
 static inline
 struct opt *new_opt(int (*show)(struct seq_file *m, void *p), void *args)

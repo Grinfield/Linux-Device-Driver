@@ -14,8 +14,16 @@
 int scull_open(struct inode *inode, struct file *filp)
 {
 	struct scull_dev *dev;
+	struct dentry *dentry;
+	const char *filename;
 
 	pr_debug("%s() is invoked\n", __FUNCTION__);
+	pr_debug("Inode number: %lu\n", inode->i_ino);
+
+	// Assume that file is pointing to a valid struct file
+	dentry = filp->f_path.dentry;
+	filename = dentry->d_name.name;
+	pr_info("Filename: %s\n", filename);
 
 	dev = container_of(inode->i_cdev, struct scull_dev, cdev);
 	filp->private_data = dev;

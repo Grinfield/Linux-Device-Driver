@@ -12,6 +12,7 @@
 #include <linux/spinlock.h>
 #include <linux/seq_file.h>
 #include <linux/interrupt.h>
+#include <linux/version.h>
 
 #include <asm/hardirq.h>
 
@@ -20,7 +21,6 @@
 
 int jit_currentime(struct seq_file *m, void *p)
 {
-	struct timespec64 tv1, tv2;
 	unsigned long j1;
 	u64 j2;
 
@@ -29,16 +29,37 @@ int jit_currentime(struct seq_file *m, void *p)
 	/* get them four */
 	j1 = jiffies;
 	j2 = get_jiffies_64();
-	ktime_get_real_ts64(&tv1);
-	ktime_get_coarse_real_ts64(&tv2);
 
-	/* print */
-	seq_printf(m ,"0x%08lx 0x%016Lx %10i.%06i\n"
-		   "%41i.%09i\n",
-		   j1, j2,
-		   (int) tv1.tv_sec, (int) tv1.tv_nsec,
-		   (int) tv2.tv_sec, (int) tv2.tv_nsec);
-	return 0;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 6, 0)
+	{
+		struct timeval tv1;
+		struct timespec tv2;
+		do_gettimeofday(&tv1);
+		tv2 = current_kernel_time();
+		/* print */
+		seq_printf(m, "0x%08lx 0x%016Lx %10i.%06i\n"
+		       "%40i.%09i\n",
+		       j1, j2,
+		       (int) tv1.tv_sec, (int) tv1.tv_usec,
+		       (int) tv2.tv_sec, (int) tv2.tv_nsec);
+	}
+#else
+	{
+		struct timespec64 tv1;
+		struct timespec64 tv2;
+		ktime_get_real_ts64(&tv1);
+		ktime_get_coarse_real_ts64(&tv2);
+		seq_printf(m, "0x%08lx 0x%016Lx %10i.%09i\n"
+		       "%40i.%09i\n",
+		       j1, j2,
+		       (int) tv1.tv_sec, (int) tv1.tv_nsec,
+		       (int) tv2.tv_sec, (int) tv2.tv_nsec);
+
+	}
+#endif
+
+
+    return 0;
 }
 
 int jit_fn(struct seq_file *m, void *p)
