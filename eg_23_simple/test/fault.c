@@ -20,7 +20,7 @@ int main(void)
 	}
 	printf("Open done!\n");
 
-	map_addr1 = mmap(NULL, 4096 * 6, PROT_READ, MAP_PRIVATE | MAP_FILE, fd, 4096);
+	map_addr1 = mmap(NULL, 4096 * 6, PROT_READ, MAP_PRIVATE | MAP_FILE, fd, 8192);
 	if (map_addr1 == ((void*)-1)) {
 		printf("map1 fail: %s\n", strerror(errno));
 		return -1;

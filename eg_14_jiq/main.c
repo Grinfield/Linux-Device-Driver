@@ -2,7 +2,7 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
-
+#include <linux/version.h>
 
 #include <linux/fs.h>
 #include <linux/proc_fs.h>
@@ -209,12 +209,22 @@ int proc_release(struct inode *inode, struct file *filp)
 	return single_release(inode, filp);
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5,6,0)
+static const struct file_operations proc_ops = {
+        .owner = THIS_MODULE,
+        .open = proc_open,
+        .read = seq_read,
+        .llseek = seq_lseek,
+        .release = proc_release,
+};
+#else
 static struct proc_ops proc_ops = {
 	.proc_open    = proc_open,
 	.proc_read    = seq_read,
 	.proc_lseek   = seq_lseek,
 	.proc_release = proc_release,
 };
+#endif
 
 static
 int m_init(void)

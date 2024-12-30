@@ -31,7 +31,8 @@ void simple_vma_close(struct vm_area_struct *vma)
 	size_t len = vma->vm_end - vma->vm_start;
 
 	last_page = pfn_to_page(pfn);
-	refc = atomic_read(&last_page->_refcount);
+	// refc = atomic_read(&last_page->_refcount);
+	refc = page_count(last_page);
 	pr_debug("pfn = %lx, last page refc when close = %d\n", pfn, refc);
 	pr_debug("vma_close -- vm_start: %#lx, vm_end: %#lx\n, len: %#lx, vm_pgoff: %#lx(%#lx), ops=%p\n",
 		 vma->vm_start, vma->vm_end, len,
@@ -64,8 +65,15 @@ static int simple_remap_mmap(struct file *filp, struct vm_area_struct *vma)
 	 * We initialize all memory to a special value: 0xdeadbeef
 	 */
 	pages = alloc_pages(GFP_KERNEL, get_order(len));
+	get_page(pages);
 	memset32(page_address(pages), 0xdeadbeef,
 		 (1 << get_order(len)) * PAGE_SIZE / 4);
+	pr_debug("pfn = %#lx, page = %px\n", page_to_pfn(pages), pages);
+
+	pr_debug("Before mapping vm_start: %#lx, vm_end: %#lx\n, len: %#lx, vm_pgoff: %#lx(%#lx), ops=%p\n",
+		 vma->vm_start, vma->vm_end, len,
+		 vma->vm_pgoff, vma->vm_pgoff << PAGE_SHIFT,
+		 vma->vm_ops);
 
 	rv = remap_pfn_range(vma, vma->vm_start, page_to_pfn(pages),
 			    vma->vm_end - vma->vm_start,
@@ -91,17 +99,42 @@ static struct file_operations simple_remap_ops = {
 	.mmap    = simple_remap_mmap,
 };
 
-static vm_fault_t simple_vma_fault(struct vm_fault *vmf)
+static int simple_vma_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
 	struct page *pageptr;
 
 	pageptr = alloc_page(GFP_KERNEL);
+	get_page(pageptr);
 	vmf->page = pageptr;
 	memset(page_address(pageptr), 0xaa, PAGE_SIZE);
 	pr_debug("xpfn = %#lx, pageptr = %px", page_to_pfn(pageptr), pageptr);
 
 	return 0;
 }
+
+#if 0
+static int simple_vma_nopage(struct vm_area_struct *vma, struct vm_fault *vmf)
+{
+	struct page *pageptr;
+	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
+	unsigned long physaddr = (unsigned long) vmf->virtual_address - vma->vm_start + offset;
+	unsigned long pageframe = physaddr >> PAGE_SHIFT;
+
+	// Eventually remove these printks
+	printk (KERN_NOTICE "---- Nopage, off %lx phys %lx\n", offset, physaddr);
+	printk (KERN_NOTICE "VA is %p\n", __va (physaddr));
+	printk (KERN_NOTICE "Page at %p\n", virt_to_page (__va (physaddr)));
+	if (!pfn_valid(pageframe))
+		return VM_FAULT_SIGBUS;
+	pageptr = pfn_to_page(pageframe);
+	printk (KERN_NOTICE "page->index = %ld mapping %p\n", pageptr->index, pageptr->mapping);
+	printk (KERN_NOTICE "Page frame %ld\n", pageframe);
+	get_page(pageptr);
+	vmf->page = pageptr;
+
+	return 0;
+}
+#endif
 
 static struct vm_operations_struct simple_fault_vm_ops = {
 	.open	=  simple_vma_open,
@@ -174,3 +207,4 @@ module_exit(m_exit);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("d0u9");
 MODULE_DESCRIPTION("A simple mmap mangement");
+
